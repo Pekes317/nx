@@ -111,6 +111,38 @@ function getStylesPartial(
   options: WebBuildBuilderOptions
 ): Configuration {
   const partial = getStylesConfig(wco);
+  const { buildOptions } = wco;
+  const cssSourceMap = buildOptions.sourceMap.styles;
+    
+  let sassImplementation: {} | undefined;
+  let fiber: {} | undefined;
+
+  try {
+   // tslint:disable-next-line:no-implicit-dependencies
+    sassImplementation = require('node-sass');
+  } catch {
+    sassImplementation = require('sass');
+    
+     try {
+      // tslint:disable-next-line:no-implicit-dependencies
+      fiber = require('fibers');
+    } catch {}
+  }
+    
+  // use includePaths from appConfig
+  const includePaths: string[] = [];
+    
+  if (
+    buildOptions.stylePreprocessorOptions &&
+    buildOptions.stylePreprocessorOptions.includePaths &&
+    buildOptions.stylePreprocessorOptions.includePaths.length > 0
+  ) {
+    buildOptions.stylePreprocessorOptions.includePaths.forEach(
+      (includePath: string) =>
+        includePaths.push(path.resolve(root, includePath))
+    );
+  }
+    
   const rules = partial.module.rules.map((rule) => {
     if (!Array.isArray(rule.use)) {
       return rule;
@@ -144,8 +176,19 @@ function getStylesPartial(
               loader: 'css-loader',
               options: {
                 modules: true,
-                importLoaders: 1,
+                importLoaders: 2,
               },
+            },
+            {
+              loader: 'sass-loader',
+              options: {
+                implementation: sassImplementation,
+                fiber,
+                sourceMap: cssSourceMap,
+                // bootstrap-sass requires a minimum precision of 8
+                precision: 8,
+                includePaths,
+              }
             },
           ],
         },
